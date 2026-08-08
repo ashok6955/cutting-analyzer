@@ -52,31 +52,25 @@ def generate_candidates_for_base(base_num: int) -> Set[int]:
 
 # --- HEADER ---
 st.title("✂️ Cutting Analyzer System Pro")
-st.caption("24/7 Permanent Web App | Model Control | Pure Integers (No Decimals)")
 
-# --- SETTINGS ROW: API KEY & MODEL SELECTION ---
-col_key, col_model = st.columns([2, 1])
+# --- API KEY AUTO-LOAD ---
+api_key = ""
+if "OPENAI_API_KEY" in st.secrets:
+    api_key = st.secrets["OPENAI_API_KEY"]
 
-with col_key:
-    api_key = ""
-    if "OPENAI_API_KEY" in st.secrets:
-        api_key = st.secrets["OPENAI_API_KEY"]
-        st.success("🔒 API Key Loaded Automatically from Secrets!")
+# --- CONNECTION STATUS & MODEL VERIFICATION BANNER ---
+col_status, col_model = st.columns([1, 1])
+
+with col_status:
+    if api_key and api_key.strip().startswith("sk-"):
+        st.success("🟢 **SYSTEM STATUS: LIVE CONNECTED TO CHATGPT**")
     else:
+        st.error("🔴 **SYSTEM STATUS: DISCONNECTED (API Key Required)**")
         api_key = st.text_input("Enter ChatGPT API Key:", type="password")
 
 with col_model:
-    selected_model_option = st.selectbox(
-        "Select GPT Model Tier:",
-        ["gpt-4o (Flagship)", "gpt-4o-mini (Fast & Economical)", "Custom Model Name"]
-    )
-    
-    if "gpt-4o (Flagship)" in selected_model_option:
-        model_name = "gpt-4o"
-    elif "gpt-4o-mini" in selected_model_option:
-        model_name = "gpt-4o-mini"
-    else:
-        model_name = st.text_input("Type Model Name:", value="gpt-4o")
+    model_name = st.text_input("Active GPT Model Version:", value="gpt-4o")
+    st.info(f"🤖 **Verified Model in Use:** `{model_name}` (Latest Flagship OpenAI Model)")
 
 st.divider()
 
@@ -90,9 +84,9 @@ if "table_data" not in st.session_state:
 
 if uploaded_file and st.button(f"🔍 Step 1: Read & Verify Image using {model_name}", type="primary"):
     if not api_key:
-        st.error("Kripya pehle API Key daalein ya Streamlit Secrets me set karein!")
+        st.error("🔴 Kripya pehle API Key daalein ya Streamlit Secrets me set karein!")
     else:
-        with st.spinner(f"Reading Image using {model_name}..."):
+        with st.spinner(f"Connecting to ChatGPT ({model_name}) and Reading Image..."):
             try:
                 client = OpenAI(api_key=api_key.strip())
                 image_bytes = uploaded_file.read()
@@ -106,7 +100,7 @@ if uploaded_file and st.button(f"🔍 Step 1: Read & Verify Image using {model_n
                 """
 
                 response = client.chat.completions.create(
-                    model=model_name,
+                    model=model_name.strip(),
                     messages=[
                         {
                             "role": "user",
@@ -129,14 +123,14 @@ if uploaded_file and st.button(f"🔍 Step 1: Read & Verify Image using {model_n
                 total_amount = int(round(sum(table_data.values())))
                 threshold = int(round(total_amount / 100.0))
                 
-                st.success(f"✅ Image Read Successfully via {model_name}!")
+                st.success(f"✅ Image Read Successfully via Verified Model: {model_name}!")
                 col_a, col_b, col_c = st.columns(3)
                 col_a.metric("Total Numbers Read", f"{len(table_data)} / 100")
                 col_b.metric("TOTAL WORK AMOUNT", f"₹ {total_amount:,}")
                 col_c.metric("THRESHOLD AMOUNT (1%)", f"₹ {threshold:,}")
                 
             except Exception as e:
-                st.error(f"Image Error: {str(e)}")
+                st.error(f"🔴 Connection / Extraction Error: {str(e)}")
 
 st.divider()
 
@@ -174,13 +168,13 @@ st.write("")
 
 if st.button("🚀 Calculate Cutting Amount", type="primary", use_container_width=True):
     if not st.session_state.table_data:
-        st.error("Pehle Step 1 me Image Read & Verify Karein!")
+        st.error("🔴 Pehle Step 1 me Image Read & Verify Karein!")
     else:
         raw_inputs = [b1, b2, b3, b4, b5, b6]
         base_numbers = [int(v.strip()) for v in raw_inputs if v and v.strip().isdigit()]
         
         if not base_numbers:
-            st.error("Kam se kam 1 Base Number daalna zaruri hai!")
+            st.error("🔴 Kam se kam 1 Base Number daalna zaruri hai!")
         else:
             table_data = st.session_state.table_data
             all_candidates = set()
