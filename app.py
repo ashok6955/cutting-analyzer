@@ -29,20 +29,25 @@ def generate_candidates_for_base(base_num: int) -> Set[int]:
     str_base = pad_number(base_num)
     d1, d2 = str_base[0], str_base[1]
     
+    # 1. Base number
     candidates.add(base_num)
+    # 2. Inside & Outside lines for both digits
     candidates.update(get_inside_line(d1))
     candidates.update(get_outside_line(d1))
     candidates.update(get_inside_line(d2))
     candidates.update(get_outside_line(d2))
     
+    # 3. Reverse / Palti
     rev_num = reverse_number(base_num)
     candidates.add(rev_num)
     
+    # 4. Plus / Minus 10
     candidates.add(base_num - 10)
     candidates.add(base_num + 10)
     candidates.add(rev_num - 10)
     candidates.add(rev_num + 10)
     
+    # 5. Adjacent (+1 / -1)
     seeds = list(candidates)
     for s in seeds:
         candidates.add(s - 1)
@@ -51,8 +56,8 @@ def generate_candidates_for_base(base_num: int) -> Set[int]:
     return {c for c in candidates if 0 <= c <= 100}
 
 # --- HEADER ---
-st.title("✂️ Cutting Analyzer System Pro")
-st.caption("24/7 Permanent Website | Image Verification | No Decimals")
+st.title("✂️ Cutting Analyzer System Pro (Latest GPT-4o)")
+st.caption("24/7 Permanent Website | Image Total Verification | Pure Integers (No Decimals)")
 
 # --- API KEY ---
 if "api_key" not in st.session_state:
@@ -76,18 +81,21 @@ if uploaded_file and st.button("🔍 Step 1: Read & Verify Image Total", type="p
     if not api_key:
         st.error("Kripya pehle API Key daalein!")
     else:
-        with st.spinner("Reading Image and Calculating Total Work..."):
+        with st.spinner("Reading Image using Latest ChatGPT GPT-4o Vision API..."):
             try:
                 client = OpenAI(api_key=api_key.strip())
                 image_bytes = uploaded_file.read()
                 base64_image = base64.b64encode(image_bytes).decode('utf-8')
                 
+                # Strict OCR extraction prompt for GPT-4o
                 prompt = """
-                Extract all numbers (01 to 100) and their amounts from this table image.
+                You are an expert table OCR scanner. Extract all numbers (01 to 100) and their amounts from this image.
                 Return ONLY a JSON object mapping padded 2-digit string numbers ("01", "02", ..., "100") to numeric amounts.
-                Example: {"01": 500, "02": 1200}. Do not include markdown or extra text.
+                Example: {"01": 500, "02": 1200, ..., "100": 300}.
+                Do not include markdown or extra text.
                 """
 
+                # Calling Latest Flagship ChatGPT Vision Model (gpt-4o)
                 response = client.chat.completions.create(
                     model="gpt-4o",
                     messages=[
@@ -112,7 +120,7 @@ if uploaded_file and st.button("🔍 Step 1: Read & Verify Image Total", type="p
                 total_amount = int(round(sum(table_data.values())))
                 threshold = int(round(total_amount / 100.0))
                 
-                st.success("✅ Image Read Successfully!")
+                st.success("✅ Image Read Successfully via Latest ChatGPT GPT-4o!")
                 col_a, col_b, col_c = st.columns(3)
                 col_a.metric("Total Numbers Read", f"{len(table_data)} / 100")
                 col_b.metric("TOTAL WORK AMOUNT", f"₹ {total_amount:,}")
@@ -133,15 +141,19 @@ for i in range(1, 7):
 cols = st.columns(6)
 b1 = cols[0].text_input("Box 1", value=st.session_state.box_1, key="b1")
 b2 = cols[1].text_input("Box 2", value=st.session_state.box_2, key="b2")
-b3 = cols[3-1].text_input("Box 3", value=st.session_state.box_3, key="b3")
-b4 = cols[4-1].text_input("Box 4", value=st.session_state.box_4, key="b4")
-b5 = cols[5-1].text_input("Box 5", value=st.session_state.box_5, key="b5")
-b6 = cols[6-1].text_input("Box 6", value=st.session_state.box_6, key="b6")
+b3 = cols[2].text_input("Box 3", value=st.session_state.box_3, key="b3")
+b4 = cols[3].text_input("Box 4", value=st.session_state.box_4, key="b4")
+b5 = cols[4].text_input("Box 5", value=st.session_state.box_5, key="b5")
+b6 = cols[5].text_input("Box 6", value=st.session_state.box_6, key="b6")
 
 col_btn1, col_btn2 = st.columns([1, 1])
 if col_btn1.button("💾 SAVE NUMBERS"):
-    for idx, val in enumerate([b1, b2, b3, b4, b5, b6], 1):
-        st.session_state[f"box_{idx}"] = val
+    st.session_state.box_1 = b1
+    st.session_state.box_2 = b2
+    st.session_state.box_3 = b3
+    st.session_state.box_4 = b4
+    st.session_state.box_5 = b5
+    st.session_state.box_6 = b6
     st.success("Base Numbers Saved!")
 
 if col_btn2.button("🔄 RESET BOXES"):
@@ -174,6 +186,7 @@ if st.button("🚀 Calculate Cutting Amount", type="primary", use_container_widt
                 num_key = pad_number(idx)
                 amount = table_data.get(num_key, 0.0)
                 if amount > threshold:
+                    # Rounding to pure integer to remove decimals like .8
                     cutting_amount = int(round(amount - threshold))
                     if cutting_amount > 0:
                         results.append((num_key, cutting_amount))
