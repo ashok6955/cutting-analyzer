@@ -1,7 +1,7 @@
 import streamlit as st
 import base64
 import json
-import pandas as pd
+import streamlit.components.v1 as components
 from datetime import datetime
 from PIL import Image
 from openai import OpenAI
@@ -9,61 +9,6 @@ from typing import Set, List, Dict, Tuple
 
 # Page Config
 st.set_page_config(page_title="Cutting Analyzer Pro", page_icon="✂️", layout="wide")
-
-# Custom CSS for Exact Paper Grid Replica
-st.markdown("""
-<style>
-    .paper-grid-table {
-        border-collapse: collapse;
-        width: 100%;
-        max-width: 900px;
-        margin: 0 auto;
-        background-color: #ffffff;
-        font-family: Arial, sans-serif;
-    }
-    .paper-grid-table td {
-        border: 1px solid #6b7280;
-        padding: 2px 3px;
-        text-align: center;
-        vertical-align: top;
-        position: relative;
-        width: 9%;
-        height: 42px;
-    }
-    .paper-grid-table td.row-total-cell {
-        border: none;
-        width: 10%;
-        font-weight: bold;
-        color: #111827;
-        vertical-align: middle;
-        font-size: 13px;
-        padding-left: 8px;
-        text-align: left;
-    }
-    .idx-red {
-        color: #dc2626; /* Red Index Number */
-        font-size: 10px;
-        font-weight: bold;
-        position: absolute;
-        top: 2px;
-        left: 3px;
-    }
-    .val-black {
-        color: #000000; /* Dark Bold Amount */
-        font-size: 13px;
-        font-weight: 800;
-        margin-top: 12px;
-    }
-    .grand-total-red-text {
-        color: #dc2626;
-        font-size: 20px;
-        font-weight: bold;
-        text-align: right;
-        max-width: 900px;
-        margin: 10px auto 0 auto;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 # Initialize Session State History
 if "history_log" not in st.session_state:
@@ -138,7 +83,7 @@ st.divider()
 tab_calc, tab_history = st.tabs(["✂️ Cutting Calculator & Audit", "📜 Calculation History Log"])
 
 with tab_calc:
-    # --- STEP 1: IMAGE VERIFICATION & EXACT HTML TABLE ---
+    # --- STEP 1: IMAGE VERIFICATION & TABLE DISPLAY ---
     st.subheader("📸 Step 1: Upload Table Image & Verify Replica Grid")
 
     uploaded_file = st.file_uploader("Upload 1-100 Table Image", type=["jpg", "jpeg", "png"])
@@ -197,36 +142,46 @@ with tab_calc:
                 except Exception as e:
                     st.error(f"🔴 Connection / Extraction Error: {str(e)}")
 
-    # RENDER EXACT PAPER REPLICA TABLE
+    # RENDER CLEAN HTML TABLE WITHOUT ANY RAW CODE
     if st.session_state.table_data:
         table_data = st.session_state.table_data
         st.markdown("### 📊 Extracted Paper Table Replica")
         
-        table_html = '<table class="paper-grid-table">'
-        grand_total_sum = 0
+        table_html = """
+        <html>
+        <head>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f8f9fa; }
+            .paper-grid-table { border-collapse: collapse; width: 100%; max-width: 850px; margin: 0 auto; background-color: #ffffff; }
+            .paper-grid-table td { border: 1px solid #7f8c8d; padding: 2px 3px; text-align: center; vertical-align: top; position: relative; width: 9%; height: 42px; }
+            .paper-grid-table td.row-total-cell { border: none; width: 10%; font-weight: bold; color: #111827; vertical-align: middle; font-size: 13px; padding-left: 8px; text-align: left; }
+            .idx-red { color: #dc2626; font-size: 10px; font-weight: bold; position: absolute; top: 2px; left: 3px; }
+            .val-black { color: #000000; font-size: 13px; font-weight: 800; margin-top: 12px; }
+            .grand-total-red-text { color: #dc2626; font-size: 20px; font-weight: bold; text-align: right; max-width: 850px; margin: 10px auto 0 auto; }
+        </style>
+        </head>
+        <body>
+        <table class="paper-grid-table">
+        """
         
+        grand_total_sum = 0
         for r in range(10):
-            table_html += '<tr>'
+            table_html += "<tr>"
             row_sum = 0
             for c in range(1, 11):
                 num_idx = r * 10 + c
                 num_str = pad_number(num_idx)
                 amt = int(round(table_data.get(num_str, 0)))
                 row_sum += amt
-                
-                table_html += f'''
-                <td>
-                    <div class="idx-red">{num_idx}</div>
-                    <div class="val-black">{amt:,}</div>
-                </td>
-                '''
-            grand_total_sum += row_sum
-            table_html += f'<td class="row-total-cell">{row_sum:,}</td>'
-            table_html += '</tr>'
+                table_html += f'<td><div class="idx-red">{num_idx}</div><div class="val-black">{amt:,}</div></td>'
             
-        table_html += '</table>'
-        st.markdown(table_html, unsafe_allow_html=True)
-        st.markdown(f'<div class="grand-total-red-text">{grand_total_sum:,}</div>', unsafe_allow_html=True)
+            grand_total_sum += row_sum
+            table_html += f'<td class="row-total-cell">{row_sum:,}</td></tr>'
+            
+        table_html += f'</table><div class="grand-total-red-text">{grand_total_sum:,}</div></body></html>'
+        
+        # Safe HTML Component Component Rendering
+        components.html(table_html, height=520, scrolling=True)
 
     st.divider()
 
@@ -294,18 +249,14 @@ with tab_calc:
                     str_base = pad_number(base)
                     d1, d2 = str_base[0], str_base[1]
                     
-                    # Categories Sets
                     inside_set = get_inside_line(d1).union(get_inside_line(d2))
                     outside_set = get_outside_line(d1).union(get_outside_line(d2))
                     palti_set = {reverse_number(base)}
                     
                     rev = reverse_number(base)
-                    plus_minus_set = {
-                        base + 10, base - 10, rev + 10, rev - 10
-                    }
+                    plus_minus_set = {base + 10, base - 10, rev + 10, rev - 10}
                     plus_minus_set = {x for x in plus_minus_set if 0 <= x <= 100}
                     
-                    # Filtering Qualifying Items per Category
                     inside_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in inside_set if table_data.get(pad_number(n), 0) > threshold]
                     outside_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in outside_set if table_data.get(pad_number(n), 0) > threshold]
                     palti_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in palti_set if table_data.get(pad_number(n), 0) > threshold]
