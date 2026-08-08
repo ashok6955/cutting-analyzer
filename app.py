@@ -66,6 +66,21 @@ def generate_candidates_for_base(base_num: int) -> Set[int]:
         
     return {c for c in candidates if 0 <= c <= 100}
 
+def format_line_with_cuts(num_list: List[int], table_data: dict, threshold: float) -> str:
+    formatted_items = []
+    for n in sorted(num_list):
+        num_str = pad_number(n)
+        amt = table_data.get(num_str, 0.0)
+        if amt > threshold:
+            cut_amt = int(round(amt - threshold))
+            if cut_amt > 0:
+                formatted_items.append(f"{num_str}={cut_amt}")
+            else:
+                formatted_items.append(num_str)
+        else:
+            formatted_items.append(num_str)
+    return ", ".join(formatted_items)
+
 # --- CLEAN HEADER UI ---
 st.markdown("## ✂️ Cutting Analyzer System Pro")
 
@@ -133,13 +148,13 @@ with tab_calc:
                     table_data_raw = json.loads(response.choices[0].message.content)
                     table_data = {str(k).zfill(2): float(v) for k, v in table_data_raw.items()}
                     st.session_state.table_data = table_data
-                    st.session_state.cut_numbers_set = set() # Reset cuts on new image
+                    st.session_state.cut_numbers_set = set()
                     st.success("✅ Image Read Successfully!")
                     
                 except Exception as e:
                     st.error(f"🔴 Connection / Extraction Error: {str(e)}")
 
-    # RENDER PAPER REPLICA TABLE WITH RED CUT HIGHLIGHTS
+    # RENDER REPLICA GRID WITH RED CUT HIGHLIGHTS
     if st.session_state.table_data:
         table_data = st.session_state.table_data
         cut_set = st.session_state.cut_numbers_set
@@ -166,7 +181,6 @@ with tab_calc:
             .scale-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
             .scale-table td { border: 1px solid #4a5568; height: 44px; padding: 2px; vertical-align: top; position: relative; background-color: #ffffff; }
             
-            /* RED HIGHLIGHT FOR CUTTING NUMBERS */
             .scale-table td.cut-red-cell {
                 background-color: #fee2e2 !important;
                 border: 2.5px solid #dc2626 !important;
@@ -197,9 +211,7 @@ with tab_calc:
                 amt = int(round(table_data.get(num_str, 0)))
                 row_sum += amt
                 
-                # Apply Red Highlight if number is in cutting output
                 is_cut = "cut-red-cell" if num_str in cut_set else ""
-                
                 table_html += f'<td class="{is_cut}"><div class="cell-red-idx">{num_idx}</div><div class="cell-black-amt">{amt:,}</div></td>'
             
             grand_total_sum += row_sum
@@ -252,7 +264,7 @@ with tab_calc:
 
     st.write("")
 
-    # --- CARD 3: RUN CUTTING & HIGHLIGHT RED ---
+    # --- CARD 3: RUN CUTTING ANALYSIS & DISPLAY ALL RESULTS ---
     if st.button("🚀 RUN CUTTING ANALYSIS", type="primary", use_container_width=True):
         if not st.session_state.table_data:
             st.error("🔴 Pehle Step 1 me Image Read & Verify Karein!")
@@ -264,7 +276,7 @@ with tab_calc:
             threshold = total_amount / 100.0
             base_numbers = [int(x) for x in active_saved_nums]
             
-            # 1. GENERATE COMBINED CANDIDATES TO HIGHLIGHT IN RED ON GRID
+            # Generate Cutting Candidate Pool
             all_candidates = set()
             for base in base_numbers:
                 all_candidates.update(generate_candidates_for_base(base))
@@ -280,64 +292,27 @@ with tab_calc:
                         combined_results.append((num_key, cut_amt))
                         cut_set.add(num_key)
             
-            # Save Cut Numbers Set into Session State & Rerun Grid
             st.session_state.cut_numbers_set = cut_set
             
             st.divider()
             
-            # --- COMPACT CATEGORY RULE ANALYSIS ---
-            st.markdown("### 📊 Compact Category Rule Analysis")
+            # --- 1. PROMINENT COMBINED FINAL CUTTING RESULT CODE ---
+            st.markdown("### ⭐ COMBINED FINAL CUTTING RESULT (Main Clipboard Code)")
+            combined_results.sort(key=lambda x: x[1], reverse=True)
             
-            for base in base_numbers:
-                str_base = pad_number(base)
-                d1, d2 = str_base[0], str_base[1]
-                
-                inside_set = get_inside_line(d1).union(get_inside_line(d2))
-                outside_set = get_outside_line(d1).union(get_outside_line(d2))
-                palti_set = {reverse_number(base)}
-                
-                rev = reverse_number(base)
-                plus_minus_set = {base + 10, base - 10, rev + 10, rev - 10}
-                plus_minus_set = {x for x in plus_minus_set if 0 <= x <= 100}
-                
-                inside_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in inside_set if table_data.get(pad_number(n), 0) > threshold]
-                outside_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in outside_set if table_data.get(pad_number(n), 0) > threshold]
-                palti_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in palti_set if table_data.get(pad_number(n), 0) > threshold]
-                pm_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in plus_minus_set if table_data.get(pad_number(n), 0) > threshold]
-                
-                with st.expander(f"🔹 Series {pad_number(base)} Category Breakdown", expanded=True):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.markdown("**1. अंदर (Inside Line):**")
-                        if inside_qual:
-                            st.write(", ".join([f"`{n}={a}`" for n, a in inside_qual]) + f" — **(Total: {len(inside_qual)})**")
-                        else:
-                            st.write("None")
-
-                        st.markdown("**2. पलटी (Reverse):**")
-                        if palti_qual:
-                            st.write(", ".join([f"`{n}={a}`" for n, a in palti_qual]))
-                        else:
-                            st.write("None")
-
-                    with col2:
-                        st.markdown("**3. बाहर (Outside Line):**")
-                        if outside_qual:
-                            st.write(", ".join([f"`{n}={a}`" for n, a in outside_qual]) + f" — **(Total: {len(outside_qual)})**")
-                        else:
-                            st.write("None")
-
-                        st.markdown("**4. ±10 Shifts:**")
-                        if pm_qual:
-                            st.write(", ".join([f"`{num}={amt}`" for num, amt in pm_qual]))
-                        else:
-                            st.write("None")
-
-            st.divider()
+            c_lines = []
+            c_grand_total = 0
+            for num_str, c_amt in combined_results:
+                c_lines.append(f"{num_str} = {c_amt}")
+                c_grand_total += c_amt
+            c_lines.append(f"GRAND TOTAL = {c_grand_total}")
+            
+            final_combined_code = "\n".join(c_lines)
+            st.code(final_combined_code, language="text")
+            
+            # --- 2. INDIVIDUAL SERIES CUTTING RESULTS ---
             st.markdown("### 📋 SEPARATE SERIES CUTTING RESULTS")
-            
-            # --- INDIVIDUAL SERIES CUTTING BLOCKS ---
-            series_tab_names = [f"Series {pad_number(b)}" for b in base_numbers] + ["⭐ COMBINED FINAL RESULT"]
+            series_tab_names = [f"Series {pad_number(b)}" for b in base_numbers]
             series_tabs = st.tabs(series_tab_names)
             
             for idx_b, base in enumerate(base_numbers):
@@ -363,35 +338,42 @@ with tab_calc:
                     s_lines.append(f"GRAND TOTAL = {s_grand_total}")
                     
                     s_code = "\n".join(s_lines)
-                    st.markdown(f"#### Series {pad_number(base)} Copy Code:")
                     st.code(s_code, language="text")
 
-            # --- COMBINED FINAL RESULT BLOCK ---
-            with series_tabs[-1]:
-                combined_results.sort(key=lambda x: x[1], reverse=True)
+            st.divider()
+
+            # --- 3. EXACT FORMATTED INSIDE & OUTSIDE BREAKDOWN ---
+            st.markdown("### 📊 INSIDE & OUTSIDE FORMATTED BREAKDOWN")
+            
+            for base in base_numbers:
+                str_base = pad_number(base)
+                d1, d2 = str_base[0], str_base[1]
                 
-                c_lines = []
-                c_grand_total = 0
-                for num_str, c_amt in combined_results:
-                    c_lines.append(f"{num_str} = {c_amt}")
-                    c_grand_total += c_amt
-                c_lines.append(f"GRAND TOTAL = {c_grand_total}")
+                ins1 = list(get_inside_line(d1))
+                out1 = list(get_outside_line(d1))
+                ins2 = list(get_inside_line(d2))
+                out2 = list(get_outside_line(d2))
                 
-                final_combined_code = "\n".join(c_lines)
-                st.markdown("#### ⭐ Combined Final Cutting Result Code:")
-                st.code(final_combined_code, language="text")
+                txt_ins1 = format_line_with_cuts(ins1, table_data, threshold)
+                txt_out1 = format_line_with_cuts(out1, table_data, threshold)
+                txt_ins2 = format_line_with_cuts(ins2, table_data, threshold)
+                txt_out2 = format_line_with_cuts(out2, table_data, threshold)
                 
-                # SAVE TO HISTORY
-                st.session_state.history_log.append({
-                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "total_work": int(round(total_amount)),
-                    "threshold": int(round(threshold)),
-                    "base_numbers": ", ".join([pad_number(b) for b in base_numbers]),
-                    "grand_total": c_grand_total,
-                    "result_code": final_combined_code
-                })
-                
-            st.rerun() # Refresh to update red grid
+                with st.expander(f"🔹 Series {pad_number(base)} Inside/Outside Lines", expanded=True):
+                    st.markdown(f"**{d1} का अंदर (Inside {d1}):** {txt_ins1}")
+                    st.markdown(f"**{d1} का बाहर (Outside {d1}):** {txt_out1}")
+                    st.markdown(f"**{d2} का अंदर (Inside {d2}):** {txt_ins2}")
+                    st.markdown(f"**{d2} का बाहर (Outside {d2}):** {txt_out2}")
+
+            # SAVE TO HISTORY LOG
+            st.session_state.history_log.append({
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "total_work": int(round(total_amount)),
+                "threshold": int(round(threshold)),
+                "base_numbers": ", ".join([pad_number(b) for b in base_numbers]),
+                "grand_total": c_grand_total,
+                "result_code": final_combined_code
+            })
 
 # --- TAB 2: HISTORY LOG ---
 with tab_history:
