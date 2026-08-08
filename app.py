@@ -10,7 +10,23 @@ from typing import Set, List, Dict, Tuple
 # Page Config
 st.set_page_config(page_title="Cutting Analyzer Pro", page_icon="✂️", layout="wide")
 
-# Initialize Session State History
+# --- PERMANENT QUERY PARAMS RECOVERY (Survives Reload) ---
+query_params = st.query_params
+for i in range(1, 7):
+    param_key = f"b{i}"
+    box_key = f"box_{i}"
+    if box_key not in st.session_state:
+        if param_key in query_params and query_params[param_key]:
+            st.session_state[box_key] = query_params[param_key]
+        else:
+            st.session_state[box_key] = ""
+
+if "table_data" not in st.session_state:
+    st.session_state.table_data = None
+
+if "scan_time" not in st.session_state:
+    st.session_state.scan_time = None
+
 if "history_log" not in st.session_state:
     st.session_state.history_log = []
 
@@ -56,10 +72,9 @@ def generate_candidates_for_base(base_num: int) -> Set[int]:
         
     return {c for c in candidates if 0 <= c <= 100}
 
-# --- HEADER ---
-st.title("✂️ Cutting Analyzer System Pro")
+# --- CLEAN HEADER UI ---
+st.markdown("## ✂️ Cutting Analyzer System Pro")
 
-# --- API KEY AUTO-LOAD ---
 api_key = ""
 if "OPENAI_API_KEY" in st.secrets:
     api_key = st.secrets["OPENAI_API_KEY"]
@@ -75,27 +90,23 @@ with col_status:
 
 with col_model:
     model_name = st.text_input("Active GPT Model Version:", value="gpt-4o")
-    st.info(f"🤖 **Verified Model in Use:** `{model_name}`")
 
 st.divider()
 
 # --- MAIN TABS ---
-tab_calc, tab_history = st.tabs(["✂️ Cutting Calculator & Audit", "📜 Calculation History Log"])
+tab_calc, tab_history = st.tabs(["✂️ Cutting Calculator", "📜 History Log"])
 
 with tab_calc:
-    # --- STEP 1: IMAGE VERIFICATION & TABLE DISPLAY ---
-    st.subheader("📸 Step 1: Upload Table Image & Verify Replica Grid")
-
+    # --- CARD 1: LIVE IMAGE SCANNER ---
+    st.markdown("### 📸 Step 1: Upload Image & Verify Live Extraction")
+    
     uploaded_file = st.file_uploader("Upload 1-100 Table Image", type=["jpg", "jpeg", "png"])
 
-    if "table_data" not in st.session_state:
-        st.session_state.table_data = None
-
-    if uploaded_file and st.button(f"🔍 Step 1: Read & Verify Image using {model_name}", type="primary"):
+    if uploaded_file and st.button(f"🔍 Read & Verify Image Live using {model_name}", type="primary"):
         if not api_key:
             st.error("🔴 Kripya pehle API Key daalein ya Streamlit Secrets me set karein!")
         else:
-            with st.spinner(f"Connecting to ChatGPT ({model_name}) and Reading Entire Image..."):
+            with st.spinner("Connecting to ChatGPT and Extracting Table Live..."):
                 try:
                     client = OpenAI(api_key=api_key.strip())
                     image_bytes = uploaded_file.read()
@@ -128,40 +139,45 @@ with tab_calc:
                     table_data_raw = json.loads(response.choices[0].message.content)
                     table_data = {str(k).zfill(2): float(v) for k, v in table_data_raw.items()}
                     st.session_state.table_data = table_data
-                    
-                    total_amount = int(round(sum(table_data.values())))
-                    threshold = int(round(total_amount / 100.0))
-                    
-                    st.success(f"✅ Image Read Successfully via Verified Model: {model_name}!")
-                    
-                    col_a, col_b, col_c = st.columns(3)
-                    col_a.metric("Total Numbers Read", f"{len(table_data)} / 100")
-                    col_b.metric("TOTAL WORK AMOUNT", f"₹ {total_amount:,}")
-                    col_c.metric("THRESHOLD AMOUNT (1%)", f"₹ {threshold:,}")
+                    st.session_state.scan_time = datetime.now().strftime("%I:%M:%S %p")
+                    st.success("✅ Live Image Extraction Verified!")
                     
                 except Exception as e:
                     st.error(f"🔴 Connection / Extraction Error: {str(e)}")
 
-    # RENDER CLEAN HTML TABLE WITHOUT ANY RAW CODE
+    # RENDER DYNAMIC DUAL-HIGHLIGHTED REPLICA GRID (PROOF OF LIVE EXTRACTION)
     if st.session_state.table_data:
         table_data = st.session_state.table_data
-        st.markdown("### 📊 Extracted Paper Table Replica")
+        total_amount = int(round(sum(table_data.values())))
+        threshold = int(round(total_amount / 100.0))
         
-        table_html = """
+        st.info(f"⚡ **LIVE OCR SCAN PROOF:** Extracted at `{st.session_state.scan_time}` via `{model_name}` | Threshold: `₹ {threshold:,}`")
+        
+        col_m1, col_m2, col_m3 = st.columns(3)
+        col_m1.metric("Total Numbers Read", f"{len(table_data)} / 100")
+        col_m2.metric("TOTAL WORK AMOUNT", f"₹ {total_amount:,}")
+        col_m3.metric("THRESHOLD AMOUNT (1%)", f"₹ {threshold:,}")
+        
+        st.markdown("#### 📊 Live Extracted Table Replica (Highlighted Green = Above Threshold)")
+        
+        table_html = f"""
         <html>
         <head>
         <style>
-            body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f8f9fa; }
-            .paper-grid-table { border-collapse: collapse; width: 100%; max-width: 850px; margin: 0 auto; background-color: #ffffff; }
-            .paper-grid-table td { border: 1px solid #7f8c8d; padding: 2px 3px; text-align: center; vertical-align: top; position: relative; width: 9%; height: 42px; }
-            .paper-grid-table td.row-total-cell { border: none; width: 10%; font-weight: bold; color: #111827; vertical-align: middle; font-size: 13px; padding-left: 8px; text-align: left; }
-            .idx-red { color: #dc2626; font-size: 10px; font-weight: bold; position: absolute; top: 2px; left: 3px; }
-            .val-black { color: #000000; font-size: 13px; font-weight: 800; margin-top: 12px; }
-            .grand-total-red-text { color: #dc2626; font-size: 20px; font-weight: bold; text-align: right; max-width: 850px; margin: 10px auto 0 auto; }
+            body {{ font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #ffffff; }}
+            .paper-grid-wrapper {{ width: 100%; max-width: 820px; margin: 0 auto; overflow-x: auto; }}
+            .scale-table {{ width: 100%; border-collapse: collapse; table-layout: fixed; }}
+            .scale-table td {{ border: 1px solid #4a5568; height: 44px; padding: 2px; vertical-align: top; position: relative; background-color: #ffffff; }}
+            .scale-table td.highlight-cell {{ background-color: #f0fdf4; border: 1.5px solid #16a34a; }}
+            .scale-table td.row-sum-col {{ border: none; width: 70px; vertical-align: middle; text-align: left; padding-left: 10px; font-weight: 800; font-size: 14px; color: #1a202c; }}
+            .cell-red-idx {{ color: #e53e3e; font-size: 10px; font-weight: 700; position: absolute; top: 2px; left: 4px; line-height: 1; }}
+            .cell-black-amt {{ color: #1a202c; font-size: 13px; font-weight: 800; text-align: center; margin-top: 14px; line-height: 1; }}
+            .grand-total-footer {{ text-align: right; font-size: 22px; font-weight: 900; color: #e53e3e; padding-top: 8px; padding-right: 15px; }}
         </style>
         </head>
         <body>
-        <table class="paper-grid-table">
+        <div class="paper-grid-wrapper">
+        <table class="scale-table">
         """
         
         grand_total_sum = 0
@@ -173,156 +189,191 @@ with tab_calc:
                 num_str = pad_number(num_idx)
                 amt = int(round(table_data.get(num_str, 0)))
                 row_sum += amt
-                table_html += f'<td><div class="idx-red">{num_idx}</div><div class="val-black">{amt:,}</div></td>'
+                
+                # Highlight in Soft Green if above threshold to give visual proof
+                h_class = "highlight-cell" if amt > threshold else ""
+                table_html += f'<td class="{h_class}"><div class="cell-red-idx">{num_idx}</div><div class="cell-black-amt">{amt:,}</div></td>'
             
             grand_total_sum += row_sum
-            table_html += f'<td class="row-total-cell">{row_sum:,}</td></tr>'
+            table_html += f'<td class="row-sum-col">{row_sum:,}</td></tr>'
             
-        table_html += f'</table><div class="grand-total-red-text">{grand_total_sum:,}</div></body></html>'
+        table_html += f'</table><div class="grand-total-footer">{grand_total_sum:,}</div></div></body></html>'
         
-        # Safe HTML Component Component Rendering
         components.html(table_html, height=520, scrolling=True)
 
     st.divider()
 
-    # --- STEP 2: BASE NUMBERS & CATEGORY-WISE AUDIT ---
-    st.subheader("🔢 Step 2: Set Base Numbers & Category Breakdown")
+    # --- CARD 2: PERMANENT BASE NUMBERS INPUT ---
+    st.markdown("### 🔢 Step 2: Enter Base Numbers")
 
-    for i in range(1, 7):
-        if f"box_{i}" not in st.session_state:
-            st.session_state[f"box_{i}"] = ""
+    def update_query_params():
+        for i in range(1, 7):
+            val = st.session_state[f"box_{i}"].strip()
+            if val:
+                st.query_params[f"b{i}"] = val
+            elif f"b{i}" in st.query_params:
+                del st.query_params[f"b{i}"]
 
     cols = st.columns(6)
-    b1 = cols[0].text_input("Box 1", value=st.session_state.box_1, key="b1")
-    b2 = cols[1].text_input("Box 2", value=st.session_state.box_2, key="b2")
-    b3 = cols[2].text_input("Box 3", value=st.session_state.box_3, key="b3")
-    b4 = cols[3].text_input("Box 4", value=st.session_state.box_4, key="b4")
-    b5 = cols[4].text_input("Box 5", value=st.session_state.box_5, key="b5")
-    b6 = cols[5].text_input("Box 6", value=st.session_state.box_6, key="b6")
+    b1 = cols[0].text_input("Box 1", key="box_1", on_change=update_query_params, placeholder="e.g. 52")
+    b2 = cols[1].text_input("Box 2", key="box_2", on_change=update_query_params, placeholder="e.g. 80")
+    b3 = cols[2].text_input("Box 3", key="box_3", on_change=update_query_params, placeholder="e.g. 26")
+    b4 = cols[3].text_input("Box 4", key="box_4", on_change=update_query_params, placeholder="e.g. 60")
+    b5 = cols[4].text_input("Box 5", key="box_5", on_change=update_query_params, placeholder="")
+    b6 = cols[5].text_input("Box 6", key="box_6", on_change=update_query_params, placeholder="")
 
-    col_btn1, col_btn2 = st.columns([1, 1])
-    if col_btn1.button("💾 SAVE BASE NUMBERS"):
-        st.session_state.box_1 = b1
-        st.session_state.box_2 = b2
-        st.session_state.box_3 = b3
-        st.session_state.box_4 = b4
-        st.session_state.box_5 = b5
-        st.session_state.box_6 = b6
-        st.success("Base Numbers Saved Successfully!")
-
-    if col_btn2.button("🔄 RESET BOXES"):
-        for idx in range(1, 7):
-            st.session_state[f"box_{idx}"] = ""
+    col_rst, _ = st.columns([1, 4])
+    if col_rst.button("🔄 RESET ALL BOXES", type="secondary"):
+        for i in range(1, 7):
+            st.session_state[f"box_{i}"] = ""
+            if f"b{i}" in st.query_params:
+                del st.query_params[f"b{i}"]
         st.rerun()
 
-    saved_list = [
-        st.session_state.box_1, st.session_state.box_2, st.session_state.box_3,
-        st.session_state.box_4, st.session_state.box_5, st.session_state.box_6
+    active_saved_nums = [
+        st.session_state[f"box_{i}"].strip()
+        for i in range(1, 7)
+        if st.session_state[f"box_{i}"].strip().isdigit()
     ]
-    active_saved_nums = [v.strip() for v in saved_list if v and v.strip().isdigit()]
 
     if active_saved_nums:
-        st.success(f"📌 **Active Saved Base Numbers:** `{', '.join(active_saved_nums)}`")
+        st.info(f"📌 **Active Base Numbers (URL Permanent):** `{', '.join(active_saved_nums)}`")
     else:
-        st.warning("⚠️ **No Base Numbers currently saved.** Please enter numbers above and click Save.")
+        st.warning("⚠️ Enter base numbers in the boxes above.")
 
     st.write("")
 
-    if st.button("🚀 Calculate Cutting Amount & Show Category Analysis", type="primary", use_container_width=True):
+    # --- CARD 3: RUN CUTTING & COMPACT CATEGORIZED AUDIT ---
+    if st.button("🚀 RUN CUTTING ANALYSIS", type="primary", use_container_width=True):
         if not st.session_state.table_data:
             st.error("🔴 Pehle Step 1 me Image Read & Verify Karein!")
+        elif not active_saved_nums:
+            st.error("🔴 Kam se kam 1 Base Number daalna zaruri hai!")
         else:
-            raw_inputs = [b1, b2, b3, b4, b5, b6]
-            base_numbers = [int(v.strip()) for v in raw_inputs if v and v.strip().isdigit()]
+            table_data = st.session_state.table_data
+            total_amount = sum(table_data.values())
+            threshold = total_amount / 100.0
+            base_numbers = [int(x) for x in active_saved_nums]
             
-            if not base_numbers:
-                st.error("🔴 Kam se kam 1 Base Number daalna zaruri hai!")
-            else:
-                table_data = st.session_state.table_data
-                total_amount = sum(table_data.values())
-                threshold = total_amount / 100.0
+            st.divider()
+            
+            # --- COMPACT CATEGORIZED RULE ANALYZER ---
+            st.markdown("### 📊 Compact Category Rule Analysis")
+            
+            for base in base_numbers:
+                str_base = pad_number(base)
+                d1, d2 = str_base[0], str_base[1]
                 
-                # --- CATEGORY-WISE BREAKDOWN ---
-                st.markdown("### 📑 Categorized Rule Analysis")
+                inside_set = get_inside_line(d1).union(get_inside_line(d2))
+                outside_set = get_outside_line(d1).union(get_outside_line(d2))
+                palti_set = {reverse_number(base)}
                 
-                for base in base_numbers:
-                    str_base = pad_number(base)
-                    d1, d2 = str_base[0], str_base[1]
-                    
-                    inside_set = get_inside_line(d1).union(get_inside_line(d2))
-                    outside_set = get_outside_line(d1).union(get_outside_line(d2))
-                    palti_set = {reverse_number(base)}
-                    
-                    rev = reverse_number(base)
-                    plus_minus_set = {base + 10, base - 10, rev + 10, rev - 10}
-                    plus_minus_set = {x for x in plus_minus_set if 0 <= x <= 100}
-                    
-                    inside_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in inside_set if table_data.get(pad_number(n), 0) > threshold]
-                    outside_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in outside_set if table_data.get(pad_number(n), 0) > threshold]
-                    palti_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in palti_set if table_data.get(pad_number(n), 0) > threshold]
-                    pm_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in plus_minus_set if table_data.get(pad_number(n), 0) > threshold]
-                    
-                    with st.expander(f"📊 Series Analysis for Base Number: {pad_number(base)}", expanded=True):
-                        st.markdown(f"#### 1. अंदर लाइन (Inside Line):")
+                rev = reverse_number(base)
+                plus_minus_set = {base + 10, base - 10, rev + 10, rev - 10}
+                plus_minus_set = {x for x in plus_minus_set if 0 <= x <= 100}
+                
+                inside_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in inside_set if table_data.get(pad_number(n), 0) > threshold]
+                outside_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in outside_set if table_data.get(pad_number(n), 0) > threshold]
+                palti_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in palti_set if table_data.get(pad_number(n), 0) > threshold]
+                pm_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in plus_minus_set if table_data.get(pad_number(n), 0) > threshold]
+                
+                with st.expander(f"🔹 Series {pad_number(base)} Category Breakdown", expanded=True):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown("**🟢 अंदर (Inside):**")
                         if inside_qual:
-                            st.write(", ".join([f"`{num}={amt}`" for num, amt in inside_qual]) + f" — **(कुल: {len(inside_qual)} नंबर)**")
+                            st.caption(", ".join([f"`{n}={a}`" for n, a in inside_qual]) + f" (Total: {len(inside_qual)})")
                         else:
-                            st.write("कोई भी नंबर थ्रेशोल्ड से ऊपर नहीं निकला।")
-                            
-                        st.markdown(f"#### 2. बाहर लाइन (Outside Line):")
-                        if outside_qual:
-                            st.write(", ".join([f"`{num}={amt}`" for num, amt in outside_qual]) + f" — **(कुल: {len(outside_qual)} नंबर)**")
-                        else:
-                            st.write("कोई भी नंबर थ्रेशोल्ड से ऊपर नहीं निकला।")
+                            st.caption("None")
 
-                        st.markdown(f"#### 3. पलटी (Reverse / Invert):")
+                        st.markdown("**🟣 पलटी (Reverse):**")
                         if palti_qual:
-                            st.write(", ".join([f"`{num}={amt}`" for num, amt in palti_qual]))
+                            st.caption(", ".join([f"`{n}={a}`" for n, a in palti_qual]))
                         else:
-                            st.write(f"पलटी (`{pad_number(rev)}`) थ्रेशोल्ड से कम है।")
+                            st.caption("None")
 
-                        st.markdown(f"#### 4. प्लस / माइनस 10 (±10 Shifts):")
+                    with col2:
+                        st.markdown("**🔵 बाहर (Outside):**")
+                        if outside_qual:
+                            st.caption(", ".join([f"`{n}={a}`" for n, a in outside_qual]) + f" (Total: {len(outside_qual)})")
+                        else:
+                            st.caption("None")
+
+                        st.markdown("**🟠 ±10 Shifts:**")
                         if pm_qual:
-                            st.write(", ".join([f"`{num}={amt}`" for num, amt in pm_qual]))
+                            st.caption(", ".join([f"`{n}={a}`" for n, a in pm_qual]))
                         else:
-                            st.write("कोई भी ±10 नंबर थ्रेशोल्ड से ऊपर नहीं निकला।")
+                            st.caption("None")
 
-                # --- GLOBAL FINAL CUTTING CALCULATION ---
+            st.divider()
+            st.markdown("### 📋 SEPARATE SERIES CUTTING RESULTS")
+            
+            # --- INDIVIDUAL SERIES CUTTING BLOCKS ---
+            series_tab_names = [f"Series {pad_number(b)}" for b in base_numbers] + ["⭐ COMBINED FINAL RESULT"]
+            series_tabs = st.tabs(series_tab_names)
+            
+            for idx_b, base in enumerate(base_numbers):
+                with series_tabs[idx_b]:
+                    series_candidates = generate_candidates_for_base(base)
+                    series_results = []
+                    
+                    for c_idx in series_candidates:
+                        num_key = pad_number(c_idx)
+                        amt = table_data.get(num_key, 0.0)
+                        if amt > threshold:
+                            cut_amt = int(round(amt - threshold))
+                            if cut_amt > 0:
+                                series_results.append((num_key, cut_amt))
+                                
+                    series_results.sort(key=lambda x: x[1], reverse=True)
+                    
+                    s_lines = []
+                    s_grand_total = 0
+                    for num_str, c_amt in series_results:
+                        s_lines.append(f"{num_str} = {c_amt}")
+                        s_grand_total += c_amt
+                    s_lines.append(f"GRAND TOTAL = {s_grand_total}")
+                    
+                    s_code = "\n".join(s_lines)
+                    st.markdown(f"#### Series {pad_number(base)} Copy Code:")
+                    st.code(s_code, language="text")
+
+            # --- COMBINED FINAL RESULT BLOCK ---
+            with series_tabs[-1]:
                 all_candidates = set()
                 for base in base_numbers:
                     all_candidates.update(generate_candidates_for_base(base))
                     
-                results: List[Tuple[str, int]] = []
-                for idx in all_candidates:
-                    num_key = pad_number(idx)
-                    amount = table_data.get(num_key, 0.0)
-                    if amount > threshold:
-                        cutting_amount = int(round(amount - threshold))
-                        if cutting_amount > 0:
-                            results.append((num_key, cutting_amount))
-                        
-                results.sort(key=lambda x: x[1], reverse=True)
+                combined_results = []
+                for c_idx in all_candidates:
+                    num_key = pad_number(c_idx)
+                    amt = table_data.get(num_key, 0.0)
+                    if amt > threshold:
+                        cut_amt = int(round(amt - threshold))
+                        if cut_amt > 0:
+                            combined_results.append((num_key, cut_amt))
+                            
+                combined_results.sort(key=lambda x: x[1], reverse=True)
                 
-                output_lines = []
-                grand_total = 0
-                for num_str, amt in results:
-                    output_lines.append(f"{num_str} = {amt}")
-                    grand_total += amt
-                    
-                output_lines.append(f"GRAND TOTAL = {grand_total}")
-                final_result_str = "\n".join(output_lines)
+                c_lines = []
+                c_grand_total = 0
+                for num_str, c_amt in combined_results:
+                    c_lines.append(f"{num_str} = {c_amt}")
+                    c_grand_total += c_amt
+                c_lines.append(f"GRAND TOTAL = {c_grand_total}")
                 
-                st.subheader("📋 Final Clipboard Output Code")
-                st.code(final_result_str, language="text")
+                final_combined_code = "\n".join(c_lines)
+                st.markdown("#### ⭐ Combined Final Cutting Result Code:")
+                st.code(final_combined_code, language="text")
                 
-                # SAVE TO HISTORY LOG
+                # SAVE TO HISTORY
                 st.session_state.history_log.append({
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "total_work": int(round(total_amount)),
                     "threshold": int(round(threshold)),
                     "base_numbers": ", ".join([pad_number(b) for b in base_numbers]),
-                    "grand_total": grand_total,
-                    "result_code": final_result_str
+                    "grand_total": c_grand_total,
+                    "result_code": final_combined_code
                 })
 
 # --- TAB 2: HISTORY LOG ---
