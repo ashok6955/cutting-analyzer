@@ -10,22 +10,13 @@ from typing import Set, List, Dict, Tuple
 # Page Config
 st.set_page_config(page_title="Cutting Analyzer Pro", page_icon="✂️", layout="wide")
 
-# --- PERMANENT QUERY PARAMS RECOVERY (Survives Reload) ---
-query_params = st.query_params
+# Initialize Session State
 for i in range(1, 7):
-    param_key = f"b{i}"
-    box_key = f"box_{i}"
-    if box_key not in st.session_state:
-        if param_key in query_params and query_params[param_key]:
-            st.session_state[box_key] = query_params[param_key]
-        else:
-            st.session_state[box_key] = ""
+    if f"box_{i}" not in st.session_state:
+        st.session_state[f"box_{i}"] = ""
 
 if "table_data" not in st.session_state:
     st.session_state.table_data = None
-
-if "scan_time" not in st.session_state:
-    st.session_state.scan_time = None
 
 if "history_log" not in st.session_state:
     st.session_state.history_log = []
@@ -97,16 +88,16 @@ st.divider()
 tab_calc, tab_history = st.tabs(["✂️ Cutting Calculator", "📜 History Log"])
 
 with tab_calc:
-    # --- CARD 1: LIVE IMAGE SCANNER ---
-    st.markdown("### 📸 Step 1: Upload Image & Verify Live Extraction")
+    # --- CARD 1: IMAGE SCANNER ---
+    st.markdown("### 📸 Step 1: Upload Image & Verify Replica Grid")
     
     uploaded_file = st.file_uploader("Upload 1-100 Table Image", type=["jpg", "jpeg", "png"])
 
-    if uploaded_file and st.button(f"🔍 Read & Verify Image Live using {model_name}", type="primary"):
+    if uploaded_file and st.button(f"🔍 Read & Verify Image using {model_name}", type="primary"):
         if not api_key:
             st.error("🔴 Kripya pehle API Key daalein ya Streamlit Secrets me set karein!")
         else:
-            with st.spinner("Connecting to ChatGPT and Extracting Table Live..."):
+            with st.spinner("Connecting to ChatGPT and Extracting Table..."):
                 try:
                     client = OpenAI(api_key=api_key.strip())
                     image_bytes = uploaded_file.read()
@@ -139,40 +130,36 @@ with tab_calc:
                     table_data_raw = json.loads(response.choices[0].message.content)
                     table_data = {str(k).zfill(2): float(v) for k, v in table_data_raw.items()}
                     st.session_state.table_data = table_data
-                    st.session_state.scan_time = datetime.now().strftime("%I:%M:%S %p")
-                    st.success("✅ Live Image Extraction Verified!")
+                    st.success("✅ Image Read Successfully!")
                     
                 except Exception as e:
                     st.error(f"🔴 Connection / Extraction Error: {str(e)}")
 
-    # RENDER DYNAMIC DUAL-HIGHLIGHTED REPLICA GRID (PROOF OF LIVE EXTRACTION)
+    # RENDER EXACT PAPER REPLICA (PURE WHITE BACKGROUND, NO GREEN)
     if st.session_state.table_data:
         table_data = st.session_state.table_data
         total_amount = int(round(sum(table_data.values())))
         threshold = int(round(total_amount / 100.0))
-        
-        st.info(f"⚡ **LIVE OCR SCAN PROOF:** Extracted at `{st.session_state.scan_time}` via `{model_name}` | Threshold: `₹ {threshold:,}`")
         
         col_m1, col_m2, col_m3 = st.columns(3)
         col_m1.metric("Total Numbers Read", f"{len(table_data)} / 100")
         col_m2.metric("TOTAL WORK AMOUNT", f"₹ {total_amount:,}")
         col_m3.metric("THRESHOLD AMOUNT (1%)", f"₹ {threshold:,}")
         
-        st.markdown("#### 📊 Live Extracted Table Replica (Highlighted Green = Above Threshold)")
+        st.markdown("#### 📊 Extracted Paper Table Replica")
         
-        table_html = f"""
+        table_html = """
         <html>
         <head>
         <style>
-            body {{ font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #ffffff; }}
-            .paper-grid-wrapper {{ width: 100%; max-width: 820px; margin: 0 auto; overflow-x: auto; }}
-            .scale-table {{ width: 100%; border-collapse: collapse; table-layout: fixed; }}
-            .scale-table td {{ border: 1px solid #4a5568; height: 44px; padding: 2px; vertical-align: top; position: relative; background-color: #ffffff; }}
-            .scale-table td.highlight-cell {{ background-color: #f0fdf4; border: 1.5px solid #16a34a; }}
-            .scale-table td.row-sum-col {{ border: none; width: 70px; vertical-align: middle; text-align: left; padding-left: 10px; font-weight: 800; font-size: 14px; color: #1a202c; }}
-            .cell-red-idx {{ color: #e53e3e; font-size: 10px; font-weight: 700; position: absolute; top: 2px; left: 4px; line-height: 1; }}
-            .cell-black-amt {{ color: #1a202c; font-size: 13px; font-weight: 800; text-align: center; margin-top: 14px; line-height: 1; }}
-            .grand-total-footer {{ text-align: right; font-size: 22px; font-weight: 900; color: #e53e3e; padding-top: 8px; padding-right: 15px; }}
+            body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #ffffff; }
+            .paper-grid-wrapper { width: 100%; max-width: 820px; margin: 0 auto; overflow-x: auto; }
+            .scale-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+            .scale-table td { border: 1px solid #4a5568; height: 44px; padding: 2px; vertical-align: top; position: relative; background-color: #ffffff; }
+            .scale-table td.row-sum-col { border: none; width: 70px; vertical-align: middle; text-align: left; padding-left: 10px; font-weight: 800; font-size: 14px; color: #1a202c; }
+            .cell-red-idx { color: #e53e3e; font-size: 10px; font-weight: 700; position: absolute; top: 2px; left: 4px; line-height: 1; }
+            .cell-black-amt { color: #1a202c; font-size: 13px; font-weight: 800; text-align: center; margin-top: 14px; line-height: 1; }
+            .grand-total-footer { text-align: right; font-size: 22px; font-weight: 900; color: #e53e3e; padding-top: 8px; padding-right: 15px; }
         </style>
         </head>
         <body>
@@ -189,10 +176,7 @@ with tab_calc:
                 num_str = pad_number(num_idx)
                 amt = int(round(table_data.get(num_str, 0)))
                 row_sum += amt
-                
-                # Highlight in Soft Green if above threshold to give visual proof
-                h_class = "highlight-cell" if amt > threshold else ""
-                table_html += f'<td class="{h_class}"><div class="cell-red-idx">{num_idx}</div><div class="cell-black-amt">{amt:,}</div></td>'
+                table_html += f'<td><div class="cell-red-idx">{num_idx}</div><div class="cell-black-amt">{amt:,}</div></td>'
             
             grand_total_sum += row_sum
             table_html += f'<td class="row-sum-col">{row_sum:,}</td></tr>'
@@ -203,31 +187,31 @@ with tab_calc:
 
     st.divider()
 
-    # --- CARD 2: PERMANENT BASE NUMBERS INPUT ---
+    # --- CARD 2: BLANK BASE NUMBERS INPUT WITH SAVE BUTTON ---
     st.markdown("### 🔢 Step 2: Enter Base Numbers")
 
-    def update_query_params():
-        for i in range(1, 7):
-            val = st.session_state[f"box_{i}"].strip()
-            if val:
-                st.query_params[f"b{i}"] = val
-            elif f"b{i}" in st.query_params:
-                del st.query_params[f"b{i}"]
-
     cols = st.columns(6)
-    b1 = cols[0].text_input("Box 1", key="box_1", on_change=update_query_params, placeholder="e.g. 52")
-    b2 = cols[1].text_input("Box 2", key="box_2", on_change=update_query_params, placeholder="e.g. 80")
-    b3 = cols[2].text_input("Box 3", key="box_3", on_change=update_query_params, placeholder="e.g. 26")
-    b4 = cols[3].text_input("Box 4", key="box_4", on_change=update_query_params, placeholder="e.g. 60")
-    b5 = cols[4].text_input("Box 5", key="box_5", on_change=update_query_params, placeholder="")
-    b6 = cols[5].text_input("Box 6", key="box_6", on_change=update_query_params, placeholder="")
+    b1 = cols[0].text_input("Box 1", value=st.session_state.box_1, key="in_b1")
+    b2 = cols[1].text_input("Box 2", value=st.session_state.box_2, key="in_b2")
+    b3 = cols[2].text_input("Box 3", value=st.session_state.box_3, key="in_b3")
+    b4 = cols[3].text_input("Box 4", value=st.session_state.box_4, key="in_b4")
+    b5 = cols[4].text_input("Box 5", value=st.session_state.box_5, key="in_b5")
+    b6 = cols[5].text_input("Box 6", value=st.session_state.box_6, key="in_b6")
 
-    col_rst, _ = st.columns([1, 4])
-    if col_rst.button("🔄 RESET ALL BOXES", type="secondary"):
+    col_btn1, col_btn2 = st.columns([1, 1])
+
+    if col_btn1.button("💾 SAVE BASE NUMBERS", type="primary"):
+        st.session_state.box_1 = b1
+        st.session_state.box_2 = b2
+        st.session_state.box_3 = b3
+        st.session_state.box_4 = b4
+        st.session_state.box_5 = b5
+        st.session_state.box_6 = b6
+        st.success("Base Numbers Saved Successfully!")
+
+    if col_btn2.button("🔄 RESET ALL BOXES", type="secondary"):
         for i in range(1, 7):
             st.session_state[f"box_{i}"] = ""
-            if f"b{i}" in st.query_params:
-                del st.query_params[f"b{i}"]
         st.rerun()
 
     active_saved_nums = [
@@ -237,18 +221,18 @@ with tab_calc:
     ]
 
     if active_saved_nums:
-        st.info(f"📌 **Active Base Numbers (URL Permanent):** `{', '.join(active_saved_nums)}`")
+        st.info(f"📌 **Active Saved Base Numbers:** `{', '.join(active_saved_nums)}` (Numbers will stay saved until Reset)")
     else:
-        st.warning("⚠️ Enter base numbers in the boxes above.")
+        st.warning("⚠️ Enter base numbers in the boxes above and click SAVE BASE NUMBERS.")
 
     st.write("")
 
-    # --- CARD 3: RUN CUTTING & COMPACT CATEGORIZED AUDIT ---
+    # --- CARD 3: RUN CUTTING & SEPARATE SERIES OUTPUTS ---
     if st.button("🚀 RUN CUTTING ANALYSIS", type="primary", use_container_width=True):
         if not st.session_state.table_data:
             st.error("🔴 Pehle Step 1 me Image Read & Verify Karein!")
         elif not active_saved_nums:
-            st.error("🔴 Kam se kam 1 Base Number daalna zaruri hai!")
+            st.error("🔴 Kam se kam 1 Base Number daalna aur SAVE karna zaruri hai!")
         else:
             table_data = st.session_state.table_data
             total_amount = sum(table_data.values())
@@ -257,7 +241,7 @@ with tab_calc:
             
             st.divider()
             
-            # --- COMPACT CATEGORIZED RULE ANALYZER ---
+            # --- COMPACT CATEGORY RULE ANALYSIS ---
             st.markdown("### 📊 Compact Category Rule Analysis")
             
             for base in base_numbers:
@@ -280,30 +264,30 @@ with tab_calc:
                 with st.expander(f"🔹 Series {pad_number(base)} Category Breakdown", expanded=True):
                     col1, col2 = st.columns(2)
                     with col1:
-                        st.markdown("**🟢 अंदर (Inside):**")
+                        st.markdown("**1. अंदर (Inside Line):**")
                         if inside_qual:
-                            st.caption(", ".join([f"`{n}={a}`" for n, a in inside_qual]) + f" (Total: {len(inside_qual)})")
+                            st.write(", ".join([f"`{n}={a}`" for n, a in inside_qual]) + f" — **(Total: {len(inside_qual)})**")
                         else:
-                            st.caption("None")
+                            st.write("None")
 
-                        st.markdown("**🟣 पलटी (Reverse):**")
+                        st.markdown("**2. पलटी (Reverse):**")
                         if palti_qual:
-                            st.caption(", ".join([f"`{n}={a}`" for n, a in palti_qual]))
+                            st.write(", ".join([f"`{n}={a}`" for n, a in palti_qual]))
                         else:
-                            st.caption("None")
+                            st.write("None")
 
                     with col2:
-                        st.markdown("**🔵 बाहर (Outside):**")
+                        st.markdown("**3. बाहर (Outside Line):**")
                         if outside_qual:
-                            st.caption(", ".join([f"`{n}={a}`" for n, a in outside_qual]) + f" (Total: {len(outside_qual)})")
+                            st.write(", ".join([f"`{n}={a}`" for n, a in outside_qual]) + f" — **(Total: {len(outside_qual)})**")
                         else:
-                            st.caption("None")
+                            st.write("None")
 
-                        st.markdown("**🟠 ±10 Shifts:**")
+                        st.markdown("**4. ±10 Shifts:**")
                         if pm_qual:
-                            st.caption(", ".join([f"`{n}={a}`" for n, a in pm_qual]))
+                            st.write(", ".join([f"`{num}={amt}`" for num, amt in pm_qual]))
                         else:
-                            st.caption("None")
+                            st.write("None")
 
             st.divider()
             st.markdown("### 📋 SEPARATE SERIES CUTTING RESULTS")
@@ -364,7 +348,7 @@ with tab_calc:
                 
                 final_combined_code = "\n".join(c_lines)
                 st.markdown("#### ⭐ Combined Final Cutting Result Code:")
-                st.code(final_combined_code, language="text")
+                st.code(final_result_str if 'final_result_str' in locals() else final_combined_code, language="text")
                 
                 # SAVE TO HISTORY
                 st.session_state.history_log.append({
