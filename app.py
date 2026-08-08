@@ -18,6 +18,9 @@ for i in range(1, 7):
 if "table_data" not in st.session_state:
     st.session_state.table_data = None
 
+if "cut_numbers_set" not in st.session_state:
+    st.session_state.cut_numbers_set = set()
+
 if "history_log" not in st.session_state:
     st.session_state.history_log = []
 
@@ -130,14 +133,17 @@ with tab_calc:
                     table_data_raw = json.loads(response.choices[0].message.content)
                     table_data = {str(k).zfill(2): float(v) for k, v in table_data_raw.items()}
                     st.session_state.table_data = table_data
+                    st.session_state.cut_numbers_set = set() # Reset cuts on new image
                     st.success("✅ Image Read Successfully!")
                     
                 except Exception as e:
                     st.error(f"🔴 Connection / Extraction Error: {str(e)}")
 
-    # RENDER EXACT PAPER REPLICA (PURE WHITE BACKGROUND, NO GREEN)
+    # RENDER PAPER REPLICA TABLE WITH RED CUT HIGHLIGHTS
     if st.session_state.table_data:
         table_data = st.session_state.table_data
+        cut_set = st.session_state.cut_numbers_set
+        
         total_amount = int(round(sum(table_data.values())))
         threshold = int(round(total_amount / 100.0))
         
@@ -146,7 +152,10 @@ with tab_calc:
         col_m2.metric("TOTAL WORK AMOUNT", f"₹ {total_amount:,}")
         col_m3.metric("THRESHOLD AMOUNT (1%)", f"₹ {threshold:,}")
         
-        st.markdown("#### 📊 Extracted Paper Table Replica")
+        if cut_set:
+            st.markdown(f"#### 📊 Extracted Paper Table Replica (<span style='color:#dc2626; font-weight:bold;'>🔴 RED BOXES = Cutting Selected ({len(cut_set)} Numbers)</span>)", unsafe_allow_html=True)
+        else:
+            st.markdown("#### 📊 Extracted Paper Table Replica")
         
         table_html = """
         <html>
@@ -156,6 +165,17 @@ with tab_calc:
             .paper-grid-wrapper { width: 100%; max-width: 820px; margin: 0 auto; overflow-x: auto; }
             .scale-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
             .scale-table td { border: 1px solid #4a5568; height: 44px; padding: 2px; vertical-align: top; position: relative; background-color: #ffffff; }
+            
+            /* RED HIGHLIGHT FOR CUTTING NUMBERS */
+            .scale-table td.cut-red-cell {
+                background-color: #fee2e2 !important;
+                border: 2.5px solid #dc2626 !important;
+            }
+            .scale-table td.cut-red-cell .cell-black-amt {
+                color: #b91c1c !important;
+                font-weight: 900 !important;
+            }
+            
             .scale-table td.row-sum-col { border: none; width: 70px; vertical-align: middle; text-align: left; padding-left: 10px; font-weight: 800; font-size: 14px; color: #1a202c; }
             .cell-red-idx { color: #e53e3e; font-size: 10px; font-weight: 700; position: absolute; top: 2px; left: 4px; line-height: 1; }
             .cell-black-amt { color: #1a202c; font-size: 13px; font-weight: 800; text-align: center; margin-top: 14px; line-height: 1; }
@@ -176,7 +196,11 @@ with tab_calc:
                 num_str = pad_number(num_idx)
                 amt = int(round(table_data.get(num_str, 0)))
                 row_sum += amt
-                table_html += f'<td><div class="cell-red-idx">{num_idx}</div><div class="cell-black-amt">{amt:,}</div></td>'
+                
+                # Apply Red Highlight if number is in cutting output
+                is_cut = "cut-red-cell" if num_str in cut_set else ""
+                
+                table_html += f'<td class="{is_cut}"><div class="cell-red-idx">{num_idx}</div><div class="cell-black-amt">{amt:,}</div></td>'
             
             grand_total_sum += row_sum
             table_html += f'<td class="row-sum-col">{row_sum:,}</td></tr>'
@@ -212,6 +236,7 @@ with tab_calc:
     if col_btn2.button("🔄 RESET ALL BOXES", type="secondary"):
         for i in range(1, 7):
             st.session_state[f"box_{i}"] = ""
+        st.session_state.cut_numbers_set = set()
         st.rerun()
 
     active_saved_nums = [
@@ -227,7 +252,7 @@ with tab_calc:
 
     st.write("")
 
-    # --- CARD 3: RUN CUTTING & SEPARATE SERIES OUTPUTS ---
+    # --- CARD 3: RUN CUTTING & HIGHLIGHT RED ---
     if st.button("🚀 RUN CUTTING ANALYSIS", type="primary", use_container_width=True):
         if not st.session_state.table_data:
             st.error("🔴 Pehle Step 1 me Image Read & Verify Karein!")
@@ -238,6 +263,25 @@ with tab_calc:
             total_amount = sum(table_data.values())
             threshold = total_amount / 100.0
             base_numbers = [int(x) for x in active_saved_nums]
+            
+            # 1. GENERATE COMBINED CANDIDATES TO HIGHLIGHT IN RED ON GRID
+            all_candidates = set()
+            for base in base_numbers:
+                all_candidates.update(generate_candidates_for_base(base))
+                
+            cut_set = set()
+            combined_results = []
+            for c_idx in all_candidates:
+                num_key = pad_number(c_idx)
+                amt = table_data.get(num_key, 0.0)
+                if amt > threshold:
+                    cut_amt = int(round(amt - threshold))
+                    if cut_amt > 0:
+                        combined_results.append((num_key, cut_amt))
+                        cut_set.add(num_key)
+            
+            # Save Cut Numbers Set into Session State & Rerun Grid
+            st.session_state.cut_numbers_set = cut_set
             
             st.divider()
             
@@ -324,19 +368,6 @@ with tab_calc:
 
             # --- COMBINED FINAL RESULT BLOCK ---
             with series_tabs[-1]:
-                all_candidates = set()
-                for base in base_numbers:
-                    all_candidates.update(generate_candidates_for_base(base))
-                    
-                combined_results = []
-                for c_idx in all_candidates:
-                    num_key = pad_number(c_idx)
-                    amt = table_data.get(num_key, 0.0)
-                    if amt > threshold:
-                        cut_amt = int(round(amt - threshold))
-                        if cut_amt > 0:
-                            combined_results.append((num_key, cut_amt))
-                            
                 combined_results.sort(key=lambda x: x[1], reverse=True)
                 
                 c_lines = []
@@ -348,7 +379,7 @@ with tab_calc:
                 
                 final_combined_code = "\n".join(c_lines)
                 st.markdown("#### ⭐ Combined Final Cutting Result Code:")
-                st.code(final_result_str if 'final_result_str' in locals() else final_combined_code, language="text")
+                st.code(final_combined_code, language="text")
                 
                 # SAVE TO HISTORY
                 st.session_state.history_log.append({
@@ -359,6 +390,8 @@ with tab_calc:
                     "grand_total": c_grand_total,
                     "result_code": final_combined_code
                 })
+                
+            st.rerun() # Refresh to update red grid
 
 # --- TAB 2: HISTORY LOG ---
 with tab_history:
