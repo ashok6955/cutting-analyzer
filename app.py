@@ -29,25 +29,20 @@ def generate_candidates_for_base(base_num: int) -> Set[int]:
     str_base = pad_number(base_num)
     d1, d2 = str_base[0], str_base[1]
     
-    # 1. Base number
     candidates.add(base_num)
-    # 2. Inside & Outside lines for both digits
     candidates.update(get_inside_line(d1))
     candidates.update(get_outside_line(d1))
     candidates.update(get_inside_line(d2))
     candidates.update(get_outside_line(d2))
     
-    # 3. Reverse / Palti
     rev_num = reverse_number(base_num)
     candidates.add(rev_num)
     
-    # 4. Plus / Minus 10
     candidates.add(base_num - 10)
     candidates.add(base_num + 10)
     candidates.add(rev_num - 10)
     candidates.add(rev_num + 10)
     
-    # 5. Adjacent (+1 / -1)
     seeds = list(candidates)
     for s in seeds:
         candidates.add(s - 1)
@@ -56,16 +51,32 @@ def generate_candidates_for_base(base_num: int) -> Set[int]:
     return {c for c in candidates if 0 <= c <= 100}
 
 # --- HEADER ---
-st.title("✂️ Cutting Analyzer System Pro (Latest GPT-4o)")
-st.caption("24/7 Permanent Website | Image Total Verification | Pure Integers (No Decimals)")
+st.title("✂️ Cutting Analyzer System Pro")
+st.caption("24/7 Permanent Web App | Model Control | Pure Integers (No Decimals)")
 
-# --- API KEY ---
-if "api_key" not in st.session_state:
-    st.session_state.api_key = ""
+# --- SETTINGS ROW: API KEY & MODEL SELECTION ---
+col_key, col_model = st.columns([2, 1])
 
-api_key = st.text_input("1. Enter ChatGPT API Key (Automatic Saved):", value=st.session_state.api_key, type="password")
-if api_key:
-    st.session_state.api_key = api_key
+with col_key:
+    api_key = ""
+    if "OPENAI_API_KEY" in st.secrets:
+        api_key = st.secrets["OPENAI_API_KEY"]
+        st.success("🔒 API Key Loaded Automatically from Secrets!")
+    else:
+        api_key = st.text_input("Enter ChatGPT API Key:", type="password")
+
+with col_model:
+    selected_model_option = st.selectbox(
+        "Select GPT Model Tier:",
+        ["gpt-4o (Flagship)", "gpt-4o-mini (Fast & Economical)", "Custom Model Name"]
+    )
+    
+    if "gpt-4o (Flagship)" in selected_model_option:
+        model_name = "gpt-4o"
+    elif "gpt-4o-mini" in selected_model_option:
+        model_name = "gpt-4o-mini"
+    else:
+        model_name = st.text_input("Type Model Name:", value="gpt-4o")
 
 st.divider()
 
@@ -77,17 +88,16 @@ uploaded_file = st.file_uploader("Upload 1-100 Table Image", type=["jpg", "jpeg"
 if "table_data" not in st.session_state:
     st.session_state.table_data = None
 
-if uploaded_file and st.button("🔍 Step 1: Read & Verify Image Total", type="primary"):
+if uploaded_file and st.button(f"🔍 Step 1: Read & Verify Image using {model_name}", type="primary"):
     if not api_key:
-        st.error("Kripya pehle API Key daalein!")
+        st.error("Kripya pehle API Key daalein ya Streamlit Secrets me set karein!")
     else:
-        with st.spinner("Reading Image using Latest ChatGPT GPT-4o Vision API..."):
+        with st.spinner(f"Reading Image using {model_name}..."):
             try:
                 client = OpenAI(api_key=api_key.strip())
                 image_bytes = uploaded_file.read()
                 base64_image = base64.b64encode(image_bytes).decode('utf-8')
                 
-                # Strict OCR extraction prompt for GPT-4o
                 prompt = """
                 You are an expert table OCR scanner. Extract all numbers (01 to 100) and their amounts from this image.
                 Return ONLY a JSON object mapping padded 2-digit string numbers ("01", "02", ..., "100") to numeric amounts.
@@ -95,9 +105,8 @@ if uploaded_file and st.button("🔍 Step 1: Read & Verify Image Total", type="p
                 Do not include markdown or extra text.
                 """
 
-                # Calling Latest Flagship ChatGPT Vision Model (gpt-4o)
                 response = client.chat.completions.create(
-                    model="gpt-4o",
+                    model=model_name,
                     messages=[
                         {
                             "role": "user",
@@ -120,7 +129,7 @@ if uploaded_file and st.button("🔍 Step 1: Read & Verify Image Total", type="p
                 total_amount = int(round(sum(table_data.values())))
                 threshold = int(round(total_amount / 100.0))
                 
-                st.success("✅ Image Read Successfully via Latest ChatGPT GPT-4o!")
+                st.success(f"✅ Image Read Successfully via {model_name}!")
                 col_a, col_b, col_c = st.columns(3)
                 col_a.metric("Total Numbers Read", f"{len(table_data)} / 100")
                 col_b.metric("TOTAL WORK AMOUNT", f"₹ {total_amount:,}")
@@ -186,7 +195,6 @@ if st.button("🚀 Calculate Cutting Amount", type="primary", use_container_widt
                 num_key = pad_number(idx)
                 amount = table_data.get(num_key, 0.0)
                 if amount > threshold:
-                    # Rounding to pure integer to remove decimals like .8
                     cutting_amount = int(round(amount - threshold))
                     if cutting_amount > 0:
                         results.append((num_key, cutting_amount))
