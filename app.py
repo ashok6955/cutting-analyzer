@@ -7,58 +7,60 @@ from PIL import Image
 from openai import OpenAI
 from typing import Set, List, Dict, Tuple
 
-# Page Config (Mobile Optimization)
+# Page Config
 st.set_page_config(page_title="Cutting Analyzer Pro", page_icon="✂️", layout="wide")
 
-# Custom CSS for Mobile-Friendly Image-like Box Cards
+# Custom CSS for Exact Paper Grid Replica
 st.markdown("""
 <style>
-    /* Mobile-Friendly Grid Styling */
-    .box-grid {
-        display: grid;
-        grid-template-columns: repeat(10, 1fr);
-        gap: 5px;
-        margin-bottom: 15px;
-    }
-    @media (max-width: 768px) {
-        .box-grid {
-            grid-template-columns: repeat(5, 1fr);
-        }
-    }
-    .box-card {
-        border: 1.5px solid #d1d5db;
-        border-radius: 6px;
+    .paper-grid-table {
+        border-collapse: collapse;
+        width: 100%;
+        max-width: 900px;
+        margin: 0 auto;
         background-color: #ffffff;
-        padding: 4px;
-        text-align: center;
-        position: relative;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-        min-height: 48px;
+        font-family: Arial, sans-serif;
     }
-    .box-idx {
-        color: #dc2626; /* Red Index Number like Paper Image */
-        font-size: 11px;
+    .paper-grid-table td {
+        border: 1px solid #6b7280;
+        padding: 2px 3px;
+        text-align: center;
+        vertical-align: top;
+        position: relative;
+        width: 9%;
+        height: 42px;
+    }
+    .paper-grid-table td.row-total-cell {
+        border: none;
+        width: 10%;
+        font-weight: bold;
+        color: #111827;
+        vertical-align: middle;
+        font-size: 13px;
+        padding-left: 8px;
+        text-align: left;
+    }
+    .idx-red {
+        color: #dc2626; /* Red Index Number */
+        font-size: 10px;
         font-weight: bold;
         position: absolute;
         top: 2px;
-        left: 4px;
+        left: 3px;
     }
-    .box-val {
-        color: #111827; /* Dark Bold Amount */
-        font-size: 14px;
-        font-weight: 800;
-        margin-top: 14px;
-    }
-    .row-total-badge {
-        background-color: #f0fdf4;
-        border: 1.5px solid #16a34a;
-        color: #15803d;
-        font-weight: 800;
-        border-radius: 6px;
-        padding: 6px;
-        text-align: center;
+    .val-black {
+        color: #000000; /* Dark Bold Amount */
         font-size: 13px;
-        margin-bottom: 12px;
+        font-weight: 800;
+        margin-top: 12px;
+    }
+    .grand-total-red-text {
+        color: #dc2626;
+        font-size: 20px;
+        font-weight: bold;
+        text-align: right;
+        max-width: 900px;
+        margin: 10px auto 0 auto;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -136,8 +138,8 @@ st.divider()
 tab_calc, tab_history = st.tabs(["✂️ Cutting Calculator & Audit", "📜 Calculation History Log"])
 
 with tab_calc:
-    # --- STEP 1: IMAGE VERIFICATION & MOBILE BOX CARDS PREVIEW ---
-    st.subheader("📸 Step 1: Upload Table Image & Verify Mobile Box Cards")
+    # --- STEP 1: IMAGE VERIFICATION & EXACT HTML TABLE ---
+    st.subheader("📸 Step 1: Upload Table Image & Verify Replica Grid")
 
     uploaded_file = st.file_uploader("Upload 1-100 Table Image", type=["jpg", "jpeg", "png"])
 
@@ -148,7 +150,7 @@ with tab_calc:
         if not api_key:
             st.error("🔴 Kripya pehle API Key daalein ya Streamlit Secrets me set karein!")
         else:
-            with st.spinner(f"Connecting to ChatGPT ({model_name}) and Extracting Boxes..."):
+            with st.spinner(f"Connecting to ChatGPT ({model_name}) and Reading Entire Image..."):
                 try:
                     client = OpenAI(api_key=api_key.strip())
                     image_bytes = uploaded_file.read()
@@ -195,36 +197,41 @@ with tab_calc:
                 except Exception as e:
                     st.error(f"🔴 Connection / Extraction Error: {str(e)}")
 
-    # RENDER MOBILE BOX CARDS IF TABLE DATA EXISTS
+    # RENDER EXACT PAPER REPLICA TABLE
     if st.session_state.table_data:
         table_data = st.session_state.table_data
-        st.markdown("### 📊 Extracted 1-100 Mobile Box Cards (Same as Image)")
+        st.markdown("### 📊 Extracted Paper Table Replica")
+        
+        table_html = '<table class="paper-grid-table">'
+        grand_total_sum = 0
         
         for r in range(10):
-            st.markdown(f"**Row {r+1} (Numbers {r*10+1} to {r*10+10}):**")
-            cards_html = '<div class="box-grid">'
+            table_html += '<tr>'
             row_sum = 0
-            
             for c in range(1, 11):
                 num_idx = r * 10 + c
                 num_str = pad_number(num_idx)
                 amt = int(round(table_data.get(num_str, 0)))
                 row_sum += amt
                 
-                cards_html += f'''
-                <div class="box-card">
-                    <div class="box-idx">{num_idx}</div>
-                    <div class="box-val">{amt:,}</div>
-                </div>
+                table_html += f'''
+                <td>
+                    <div class="idx-red">{num_idx}</div>
+                    <div class="val-black">{amt:,}</div>
+                </td>
                 '''
-            cards_html += '</div>'
-            st.markdown(cards_html, unsafe_allow_html=True)
-            st.markdown(f'<div class="row-total-badge">ROW {r+1} TOTAL = ₹ {row_sum:,}</div>', unsafe_allow_html=True)
+            grand_total_sum += row_sum
+            table_html += f'<td class="row-total-cell">{row_sum:,}</td>'
+            table_html += '</tr>'
+            
+        table_html += '</table>'
+        st.markdown(table_html, unsafe_allow_html=True)
+        st.markdown(f'<div class="grand-total-red-text">{grand_total_sum:,}</div>', unsafe_allow_html=True)
 
     st.divider()
 
-    # --- STEP 2: BASE NUMBERS & CUTTING ---
-    st.subheader("🔢 Step 2: Set Base Numbers & Detailed Series Audit")
+    # --- STEP 2: BASE NUMBERS & CATEGORY-WISE AUDIT ---
+    st.subheader("🔢 Step 2: Set Base Numbers & Category Breakdown")
 
     for i in range(1, 7):
         if f"box_{i}" not in st.session_state:
@@ -266,7 +273,7 @@ with tab_calc:
 
     st.write("")
 
-    if st.button("🚀 Calculate Cutting Amount & Generate Project Audit", type="primary", use_container_width=True):
+    if st.button("🚀 Calculate Cutting Amount & Show Category Analysis", type="primary", use_container_width=True):
         if not st.session_state.table_data:
             st.error("🔴 Pehle Step 1 me Image Read & Verify Karein!")
         else:
@@ -280,41 +287,54 @@ with tab_calc:
                 total_amount = sum(table_data.values())
                 threshold = total_amount / 100.0
                 
-                # --- DETAILED SERIES AUDIT BREAKDOWN ---
-                st.markdown("### 📑 Detailed Series Project Audit")
+                # --- CATEGORY-WISE BREAKDOWN ---
+                st.markdown("### 📑 Categorized Rule Analysis")
                 
                 for base in base_numbers:
                     str_base = pad_number(base)
                     d1, d2 = str_base[0], str_base[1]
                     
-                    ins1 = sorted(list(get_inside_line(d1)))
-                    out1 = sorted(list(get_outside_line(d1)))
-                    ins2 = sorted(list(get_inside_line(d2)))
-                    out2 = sorted(list(get_outside_line(d2)))
+                    # Categories Sets
+                    inside_set = get_inside_line(d1).union(get_inside_line(d2))
+                    outside_set = get_outside_line(d1).union(get_outside_line(d2))
+                    palti_set = {reverse_number(base)}
                     
                     rev = reverse_number(base)
-                    plus10 = base + 10 if base + 10 <= 100 else None
-                    minus10 = base - 10 if base - 10 >= 0 else None
-                    rev_plus10 = rev + 10 if rev + 10 <= 100 else None
-                    rev_minus10 = rev - 10 if rev - 10 >= 0 else None
+                    plus_minus_set = {
+                        base + 10, base - 10, rev + 10, rev - 10
+                    }
+                    plus_minus_set = {x for x in plus_minus_set if 0 <= x <= 100}
                     
-                    series_candidates = generate_candidates_for_base(base)
-                    qualifying_in_series = [
-                        (pad_number(idx), int(round(table_data.get(pad_number(idx), 0) - threshold)))
-                        for idx in series_candidates
-                        if table_data.get(pad_number(idx), 0) > threshold
-                    ]
-                    qualifying_in_series.sort(key=lambda x: x[1], reverse=True)
+                    # Filtering Qualifying Items per Category
+                    inside_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in inside_set if table_data.get(pad_number(n), 0) > threshold]
+                    outside_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in outside_set if table_data.get(pad_number(n), 0) > threshold]
+                    palti_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in palti_set if table_data.get(pad_number(n), 0) > threshold]
+                    pm_qual = [(pad_number(n), int(round(table_data.get(pad_number(n), 0) - threshold))) for n in plus_minus_set if table_data.get(pad_number(n), 0) > threshold]
                     
-                    with st.expander(f"🔍 Series Audit for Base Number: {pad_number(base)}", expanded=True):
-                        st.write(f"**Digit '{d1}' Inside Line:** `{', '.join([pad_number(x) for x in ins1])}`")
-                        st.write(f"**Digit '{d1}' Outside Line:** `{', '.join([pad_number(x) for x in out1])}`")
-                        st.write(f"**Digit '{d2}' Inside Line:** `{', '.join([pad_number(x) for x in ins2])}`")
-                        st.write(f"**Digit '{d2}' Outside Line:** `{', '.join([pad_number(x) for x in out2])}`")
-                        st.write(f"**Reverse / Invert (Palti):** `{pad_number(rev)}`")
-                        st.write(f"**Base +10 (Add):** `{pad_number(plus10) if plus10 is not None else 'N/A'}` | **Base -10 (Subtract):** `{pad_number(minus10) if minus10 is not None else 'N/A'}`")
-                        st.write(f"**Reverse +10:** `{pad_number(rev_plus10) if rev_plus10 is not None else 'N/A'}` | **Reverse -10:** `{pad_number(rev_minus10) if rev_minus10 is not None else 'N/A'}`")
-                        st.info(f"**Series Cut Selected Count:** {len(qualifying_in_series)} numbers qualified above threshold in Series {pad_number(base)}.")
+                    with st.expander(f"📊 Series Analysis for Base Number: {pad_number(base)}", expanded=True):
+                        st.markdown(f"#### 1. अंदर लाइन (Inside Line):")
+                        if inside_qual:
+                            st.write(", ".join([f"`{num}={amt}`" for num, amt in inside_qual]) + f" — **(कुल: {len(inside_qual)} नंबर)**")
+                        else:
+                            st.write("कोई भी नंबर थ्रेशोल्ड से ऊपर नहीं निकला।")
+                            
+                        st.markdown(f"#### 2. बाहर लाइन (Outside Line):")
+                        if outside_qual:
+                            st.write(", ".join([f"`{num}={amt}`" for num, amt in outside_qual]) + f" — **(कुल: {len(outside_qual)} नंबर)**")
+                        else:
+                            st.write("कोई भी नंबर थ्रेशोल्ड से ऊपर नहीं निकला।")
+
+                        st.markdown(f"#### 3. पलटी (Reverse / Invert):")
+                        if palti_qual:
+                            st.write(", ".join([f"`{num}={amt}`" for num, amt in palti_qual]))
+                        else:
+                            st.write(f"पलटी (`{pad_number(rev)}`) थ्रेशोल्ड से कम है।")
+
+                        st.markdown(f"#### 4. प्लस / माइनस 10 (±10 Shifts):")
+                        if pm_qual:
+                            st.write(", ".join([f"`{num}={amt}`" for num, amt in pm_qual]))
+                        else:
+                            st.write("कोई भी ±10 नंबर थ्रेशोल्ड से ऊपर नहीं निकला।")
 
                 # --- GLOBAL FINAL CUTTING CALCULATION ---
                 all_candidates = set()
