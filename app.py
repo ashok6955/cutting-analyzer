@@ -1,6 +1,7 @@
 import streamlit as st
 import base64
 import json
+import pandas as pd
 from PIL import Image
 from openai import OpenAI
 from typing import Set, List, Dict, Tuple
@@ -74,8 +75,8 @@ with col_model:
 
 st.divider()
 
-# --- STEP 1: IMAGE VERIFICATION ---
-st.subheader("📸 Step 1: Upload Table Image & Verify Total Work")
+# --- STEP 1: IMAGE VERIFICATION & GRID PREVIEW ---
+st.subheader("📸 Step 1: Upload Table Image & Verify 100-Grid Table")
 
 uploaded_file = st.file_uploader("Upload 1-100 Table Image", type=["jpg", "jpeg", "png"])
 
@@ -86,7 +87,7 @@ if uploaded_file and st.button(f"🔍 Step 1: Read & Verify Image using {model_n
     if not api_key:
         st.error("🔴 Kripya pehle API Key daalein ya Streamlit Secrets me set karein!")
     else:
-        with st.spinner(f"Connecting to ChatGPT ({model_name}) and Reading Image..."):
+        with st.spinner(f"Connecting to ChatGPT ({model_name}) and Extracting 100 Grid Cells..."):
             try:
                 client = OpenAI(api_key=api_key.strip())
                 image_bytes = uploaded_file.read()
@@ -124,10 +125,31 @@ if uploaded_file and st.button(f"🔍 Step 1: Read & Verify Image using {model_n
                 threshold = int(round(total_amount / 100.0))
                 
                 st.success(f"✅ Image Read Successfully via Verified Model: {model_name}!")
+                
+                # --- SUMMARY METRICS ---
                 col_a, col_b, col_c = st.columns(3)
                 col_a.metric("Total Numbers Read", f"{len(table_data)} / 100")
                 col_b.metric("TOTAL WORK AMOUNT", f"₹ {total_amount:,}")
                 col_c.metric("THRESHOLD AMOUNT (1%)", f"₹ {threshold:,}")
+                
+                # --- 10x10 VISUAL GRID TABLE PREVIEW ---
+                st.markdown("### 📊 Extracted 1-100 Table Grid (Verify Amounts Here)")
+                
+                grid_rows = []
+                for r in range(10):
+                    row_dict = {}
+                    row_sum = 0
+                    for c in range(1, 11):
+                        num_idx = r * 10 + c
+                        num_str = pad_number(num_idx)
+                        amt = int(round(table_data.get(num_str, 0)))
+                        row_dict[f"Col {c} ({num_str})"] = amt
+                        row_sum += amt
+                    row_dict["TOTAL"] = row_sum
+                    grid_rows.append(row_dict)
+                
+                df_grid = pd.DataFrame(grid_rows, index=[f"Row {r*10+1}-{r*10+10}" for r in range(10)])
+                st.dataframe(df_grid, use_container_width=True)
                 
             except Exception as e:
                 st.error(f"🔴 Connection / Extraction Error: {str(e)}")
@@ -150,19 +172,31 @@ b5 = cols[4].text_input("Box 5", value=st.session_state.box_5, key="b5")
 b6 = cols[5].text_input("Box 6", value=st.session_state.box_6, key="b6")
 
 col_btn1, col_btn2 = st.columns([1, 1])
-if col_btn1.button("💾 SAVE NUMBERS"):
+if col_btn1.button("💾 SAVE BASE NUMBERS"):
     st.session_state.box_1 = b1
     st.session_state.box_2 = b2
     st.session_state.box_3 = b3
     st.session_state.box_4 = b4
     st.session_state.box_5 = b5
     st.session_state.box_6 = b6
-    st.success("Base Numbers Saved!")
+    st.success("Base Numbers Saved Successfully!")
 
 if col_btn2.button("🔄 RESET BOXES"):
     for idx in range(1, 7):
         st.session_state[f"box_{idx}"] = ""
     st.rerun()
+
+# --- ACTIVE SAVED NUMBERS DISPLAY BADGE ---
+saved_list = [
+    st.session_state.box_1, st.session_state.box_2, st.session_state.box_3,
+    st.session_state.box_4, st.session_state.box_5, st.session_state.box_6
+]
+active_saved_nums = [v.strip() for v in saved_list if v and v.strip().isdigit()]
+
+if active_saved_nums:
+    st.success(f"📌 **Active Saved Base Numbers:** `{', '.join(active_saved_nums)}`")
+else:
+    st.warning("⚠️ **No Base Numbers currently saved.** Please enter numbers above and click Save.")
 
 st.write("")
 
